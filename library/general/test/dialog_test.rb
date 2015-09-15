@@ -23,6 +23,17 @@ class TestDialog2 < TestDialog
   end
 end
 
+class StderrTestDialog < UI::Dialog
+  def dialog_content
+    PushButton(Id(:ok), "Hello, World!")
+  end
+
+  def ok_handler
+    $stderr.puts "Something went wrong"
+    finish_dialog
+  end
+end
+
 describe UI::Dialog do
   subject { TestDialog }
   describe ".run" do
@@ -75,6 +86,28 @@ describe UI::Dialog do
         .with(Yast::Term.new(:opt, :defaultsize), anything)
 
       TestDialog2.run
+    end
+  end
+
+  # We do not have a proper ncurses in travis at the moment
+  if !ENV["TRAVIS"]
+    context "when running the ncurses interface" do
+      before(:all) do
+        Yast.ui_component = "ncurses"
+      end
+
+      before(:each) do
+        Yast::UI.OpenUI
+      end
+
+      after(:each) do
+        Yast::UI.CloseUI
+      end
+
+      it "does not fall apart when stderr is used" do
+        allow(Yast::UI).to receive(:UserInput).and_return(:ok)
+        expect {StderrTestDialog.new.run}.to_not raise_error
+      end
     end
   end
 end
