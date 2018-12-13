@@ -487,6 +487,10 @@ module Yast
     # @return [String] path to already cached workflow file, control file is downloaded if not yet cached
     #   or nil if failed to get filename
     def GetCachedWorkflowFilename(type, src_id, name = "")
+      if type == :pepe
+        return "/usr/share/installation-products/pepe.xml"
+      end
+
       if ![:package, :addon].include?(type)
         Builtins.y2error("Unknown workflow type: %1", type)
         return nil
@@ -526,7 +530,7 @@ module Yast
     # Stores new workflow (if such workflow exists) into the Worflow Store.
     #
     # @param [Symbol] type :addon or :package
-    # @param intger src_id with source ID
+    # @param [Integer] src_id with source ID
     # @param [String] name with unique identification name of the object
     #        ("" for `addon, package name for :package)
     # @return [Boolean] whether successful (true also in case of no workflow file)
@@ -540,20 +544,20 @@ module Yast
         src_id,
         name
       )
-      if !Builtins.contains([:addon, :package], type)
+      if ![:addon, :package, :pepe].include?(type)
         Builtins.y2error("Unknown workflow type: %1", type)
         return false
       end
 
-      name = "" if type == :addon
+      name = "" unless type == :package
       # new xml filename
       used_filename = GetCachedWorkflowFilename(type, src_id, name)
 
       if !used_filename.nil? && used_filename != ""
         @unmerged_changes = true
 
-        @used_workflows = Builtins.add(@used_workflows, used_filename)
-        Ops.set(@workflows_to_sources, used_filename, src_id)
+        @used_workflows << used_filename
+        @workflows_to_sources[used_filename] = src_id unless type == :pepe
       end
 
       true
@@ -1500,19 +1504,22 @@ module Yast
     #
     # @param product [Y2Packager::Product] Base product
     def merge_product_workflow(product)
-      return false unless product.installation_package
+      if product
+        return false unless product.installation_package
 
-      log.info "Merging #{product.label} workflow"
+        log.info "Merging #{product.label} workflow"
 
-      if merged_base_product
-        Yast::WorkflowManager.RemoveWorkflow(
-          :package,
-          merged_base_product.installation_package_repo,
-          merged_base_product.installation_package
-        )
+        if merged_base_product
+          Yast::WorkflowManager.RemoveWorkflow(
+            :package,
+            merged_base_product.installation_package_repo,
+            merged_base_product.installation_package
+          )
+        end
       end
 
-      AddWorkflow(:package, product.installation_package_repo, product.installation_package)
+      # AddWorkflow(:package, product.installation_package_repo, product.installation_package)
+      AddWorkflow(:pepe, 0, "")
       MergeWorkflows()
       RedrawWizardSteps()
       self.merged_base_product = product
